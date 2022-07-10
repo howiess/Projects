@@ -1,0 +1,88 @@
+---
+title: "sm check schools with date slider"
+author: "Howie Huang"
+date: '2022-06-22'
+output: html_document
+---
+
+```{r}
+setwd("C:/Users/howie/Desktop")
+df<-read.csv('C:/Users/howie/Desktop/SM-Schools.csv')
+```
+
+
+```{r}
+library(RJSONIO)
+library(RCurl)
+library(XML)
+library(xml2)
+library(RSelenium)
+library(rvest)
+library(netstat)
+library(stringr)
+library(tidyverse)
+
+# list of school that uses date slider
+ls_school<-df$slider
+ls_school<-ls_school[ls_school != ""]
+
+# start the server
+rs_driver_object<-rsDriver(browser = 'chrome',
+                           chromever = 'latest',
+                           verbose = FALSE,
+                           port = free_port())
+
+# create a client object
+remDr<-rs_driver_object$client
+
+# navigate
+remDr$navigate('https://enroll.smcovered.com/')
+
+test<-function(y){
+# refresh
+remDr$refresh()
+Sys.sleep(1)
+  
+# birthday 
+birthday<-remDr$findElement(using = 'xpath','//input[@placeholder="Enter Date of Birth"]')
+birthday$sendKeysToElement(list('06/01/2001', key = 'enter'))
+
+# student category
+category<-remDr$findElement(using = 'xpath','//div[@title="Choose option"]')
+category$clickElement()
+Sys.sleep(0.2)
+
+F_1<-remDr$findElement(using = 'xpath','//*[text()="F1 International"]')
+F_1$clickElement()
+
+# school
+school<-remDr$findElement(using = 'xpath','//input[@placeholder="Enter School/Organization"]')
+school$sendKeysToElement(list(y, key = 'enter'))
+Sys.sleep(1)
+
+school_drop_down<-remDr$findElement(using = 'xpath','//div[@class="px-4 py-3 whitespace-no-wrap text-overflow-ellipsis"]')
+school_drop_down$clickElement()
+
+# click next
+Sys.sleep(1)
+Next<-remDr$findElement(using = 'xpath','//*[text()="Next"]')
+Next$clickElement()
+
+# get plan name
+Sys.sleep(1)
+names<-remDr$findElements(using = 'xpath','//div[@class="md:px-6 md:py-10 md:-mx-6"]
+                          //span[@class="text-secondary font-bold"]')
+
+plan_names<-lapply(names, function(x) x$getElementText()) %>% unlist()
+plan_names<-plan_names[!plan_names %in% ""]
+
+# return 
+return(plan_names)
+}
+
+result<-lapply(ls_school, test)
+result
+
+# terminate the selenium server
+system('taskkill /im java.exe /f')
+```
