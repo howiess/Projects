@@ -1,0 +1,195 @@
+---
+title: "STA 141B HW4"
+author: "Howie Huang"
+date: '2022-06-08'
+output:
+  html_document:
+    df_print: paged
+---
+
+***
+# Initial Input
+```{r,warning=FALSE}
+library(RJSONIO)
+library(RCurl)
+library(XML)
+library(xml2)
+u= "https://www.indeed.com/jobs?q=data%20scientist&l=California&from=searchOnHP&vjk=3f69f8082949eaef"
+tt = getURLContent(u,followlocation = TRUE)
+doc = htmlParse(tt)
+```
+
+***
+# Next Page
+```{r}
+next.page<-function(x){
+page<-getNodeSet(doc,"//ul[@class = 'pagination-list']//li//a[contains(@aria-label,'Next')]/@href")
+next.url<-lapply(page,function(x) getRelativeURL(x,baseURL = "https://www.indeed.com"))
+tt<<-getURLContent(next.url,followlocation = TRUE)
+doc<<-htmlParse(tt)
+}
+next.page(doc)
+```
+
+***
+# Title
+```{r}
+get.title<-function(x){
+  j<- getNodeSet(x, "//td[@class = 'resultContent' and 
+               .//div[@class = 'heading4 color-text-primary singleLineTitle tapItem-gutter']]
+               //h2
+               //a
+               //span")
+  job.title<<-xmlValue(j)
+  return(job.title)
+}
+get.title(doc)
+```
+
+***
+# Job Description URL
+```{r}
+description.url<-function(x){
+N = getNodeSet(x, "//td[@class = 'resultContent' and 
+               .//div[@class = 'heading4 color-text-primary singleLineTitle tapItem-gutter']]
+               //h2
+               //a/@href
+               ")
+jobdescription.url<<-lapply(N, function(x) getRelativeURL(x,baseURL = "https://www.indeed.com"))
+return(jobdescription.url)
+}
+description.url(doc)
+```
+
+***
+# Company URL
+```{r}
+company.url<-function(x){
+k.url = getNodeSet(x, "//td[@class = 'resultContent' and 
+               .//div[@class = 'heading6 company_location tapItem-gutter companyInfo']]
+               //span[contains(@class,'companyName')]
+               //a/@href
+               ")
+companydes.url<<-lapply(k.url, function(x) getRelativeURL(x,baseURL = "https://www.indeed.com"))
+return(companydes.url)
+}
+company.url(doc)
+```
+
+***
+# Company name
+```{r}
+company.name<-function(x){
+k = getNodeSet(x, "//td[@class = 'resultContent' and 
+               .//div[@class = 'heading6 company_location tapItem-gutter companyInfo']]
+               //span[contains(@class,'companyName')]
+               ")
+company<<- xmlValue(k)
+return(company)
+}
+company.name(doc)
+```
+
+***
+# Company Info
+```{r}
+read.company<-function(x){
+  tt.founded<<-getURLContent(x,followlocation = TRUE)
+  doc.founded<<-htmlParse(tt.founded)
+  founded.date<<-xmlValue(getNodeSet(doc.founded,"//ul[@class = 'css-1vd66n9 e37uo190']
+           //li[@data-testid='companyInfo-founded']
+           //div[@class = 'css-1w0iwyp e1wnkr790']"))
+  size<<-xmlValue(getNodeSet(doc.founded,"//ul[@class = 'css-1vd66n9 e37uo190']
+           //li[@data-testid='companyInfo-employee']
+           //div[@class = 'css-1w0iwyp e1wnkr790']
+           //div"))
+  return(c(founded.date,size))
+}
+founded.dates.and.size<-lapply(companydes.url, read.company)
+founded.dates.and.size
+```
+
+***
+# Location
+```{r}
+location<-function(x){
+L = getNodeSet(x, "//td[@class = 'resultContent' and 
+               .//div[@class = 'heading6 company_location tapItem-gutter companyInfo']]
+               //div[contains(@class,'companyLocation')]
+               ")
+location<<-xmlValue(L)
+return(location)
+}
+location(doc)
+```
+
+*** 
+# Salary
+```{r}
+salary<-function(x){
+M = getNodeSet(x, "//td[@class = 'resultContent' and 
+               .//div[@class = 'heading6 tapItem-gutter metadataContainer noJEMChips salaryOnly']]
+               //div[contains(@class,'metadata salary-snippet-container')]
+               //div
+               ")
+salaary<<-xmlValue(M)
+return(salaary)
+}
+salary(doc)
+
+
+salarytype<-function(x){
+MM<- getNodeSet(x, "//td[@class = 'resultContent' and 
+               .//div[@class = 'heading6 tapItem-gutter metadataContainer noJEMChips salaryOnly' and
+               .//div[@class = 'metadata']]]
+               //div[contains(@class,'attribute_snippet')]
+               //svg[contains(@aria-label,'Job type')]/parent::node()
+               ")
+salary.type<<-xmlValue(MM)
+return(salary.type)
+}
+salarytype(doc)
+```
+
+*** 
+# Post Status (Date)
+```{r}
+datestatus<-function(x){
+O = getNodeSet(x, "//div[@class = 'heading6 tapItem-gutter result-footer']
+                    //span[contains(@class,'date')]
+               ")
+date.status<<-xmlValue(O)
+return(date.status)
+}
+datestatus(doc)
+```
+
+***
+# Full Description 
+```{r}
+read.des<-function(x){
+  tt.job<<-getURLContent(x,followlocation = TRUE)
+  doc.job<<-htmlParse(tt.job)
+  a<-getNodeSet(doc.job,"//div[contains(@id,'jobDescriptionText')]")
+  fulldes<<-xmlValue(a)
+  return(fulldes)
+}
+jobdes.list<-lapply(jobdescription.url, function(x) read.des(x))
+cat(jobdes.list[[9]])
+```
+
+***
+# Experience Needed
+```{r}
+read.exp<-function(x){
+  tt.job<<-getURLContent(x,followlocation = TRUE)
+  doc.job<<-htmlParse(tt.job)
+  a<-getNodeSet(doc.job,"//div[contains(@id,'jobDescriptionText')]
+             //b")
+  b<-grep('(.*require.*|.*skill.*|.*experience.*|.*qualification.*|.*expect.*)',xmlValue(a),ignore.case = TRUE)
+
+  exp.list<<-lapply(b,function(x) xmlValue(getNodeSet(a[[x]], "parent::node()/following-sibling::*[1]//li")))
+return(exp.list)
+}
+read.exp(jobdescription.url[[9]])
+```
