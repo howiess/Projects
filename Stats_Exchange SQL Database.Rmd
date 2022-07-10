@@ -1,0 +1,372 @@
+---
+title: "STA 141B HW3"
+author: "Howie Huang"
+date: "5/23/2022"
+output: pdf_document
+---
+
+```{r,results='hide',warning=FALSE,message=FALSE,echo=FALSE}
+library(DBI)
+library(RSQLite)
+library(tidyverse)
+
+db<- dbConnect(SQLite(), "~/Desktop/StatsSO.sqlite")
+```
+
+***
+#1 What is the date range for the questions and answers in this database?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+date.question<-dbGetQuery(db,'SELECT CreationDate 
+                   FROM Posts 
+                   WHERE PostTypeId ="1"
+                   AND CreationDate != "NA"
+                   ORDER BY CreationDate ASC')
+
+date.answer<-dbGetQuery(db,'SELECT CreationDate 
+                   FROM Posts 
+                   WHERE PostTypeId ="2"
+                   AND CreationDate != "NA"
+                   ORDER BY CreationDate ASC')
+range.date.question<-c(date.question[1,],date.question[nrow(date.question),]) %>% print
+range.date.answer<-c(date.answer[1,],date.answer[nrow(date.answer),]) %>% print
+rm(date.question,date.answer)
+```
+
+***
+#2 How many users are there?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+num.user<-as.integer(dbGetQuery(db,'SELECT COUNT(Id) 
+                                FROM Users')) %>% print
+rm(num.user)
+```
+
+***
+#3 How many users joined since 2020?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+num.2020<-nrow(dbGetQuery(db,'SELECT CreationDate 
+                          FROM Users 
+                          WHERE CreationDate > "2020%"')) %>% print 
+rm(num.2020)
+```
+
+***
+#4 How many users joined each year? Describe this with a plot.
+```{r,results='hide',warning=FALSE,message=FALSE,}
+num.user.2009<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2009"')
+num.user.2010<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2010"')
+num.user.2011<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2011"')
+num.user.2012<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2012"')
+num.user.2013<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2013"')
+num.user.2014<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2014"')
+num.user.2015<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2015"')
+num.user.2016<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2016"')
+num.user.2017<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2017"')
+num.user.2018<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2018"')
+num.user.2019<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2019"')
+num.user.2020<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2020"')
+num.user.2021<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2021"')
+num.user.2022<-dbGetQuery(db,'SELECT COUNT(*) 
+                          FROM Users 
+                          WHERE strftime("%Y", CreationDate) = "2022"')
+num.user.eachyear<-as.integer(c(num.user.2009,num.user.2010,num.user.2011,num.user.2012,num.user.2013,num.user.2014,
+                              num.user.2015,num.user.2016,num.user.2017,num.user.2018,num.user.2019,
+                              num.user.2020,num.user.2021,num.user.2022)) %>% print
+
+year<-c(2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022)
+df<-data.frame(year,num.user.eachyear)
+plot(num.user.eachyear~year, data=df)
+
+rm(num.user.2009,num.user.2010,num.user.2011,num.user.2012,num.user.2013,num.user.2014,
+   num.user.2015,num.user.2016,num.user.2017,num.user.2018,num.user.2019,
+   num.user.2020,num.user.2021,num.user.2022,df,year)
+```
+
+***
+#5 How many users have asked at least one question?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+num.user.1q<-as.integer(dbGetQuery(db,'SELECT COUNT(DISTINCT(OwnerUserId)) 
+                     FROM Posts
+                     WHERE PostTypeId ="1"'))%>% print
+
+    # How many have only answered questions?
+num.user.ansonly<-as.integer(dbGetQuery(db,'SELECT COUNT(DISTINCT(OwnerUserId))
+                     FROM Posts
+                     WHERE NOT PostTypeId IN ("1","3","4","5","6","7","8")
+                     AND NOT OwnerUserId IN (SELECT DISTINCT(UserId) FROM Comments)'))
+
+    # How many have only commented?
+num.user.comonly<-as.integer(dbGetQuery(db,'SELECT COUNT(DISTINCT(UserID))
+                     FROM Comments
+                     WHERE NOT UserId IN (SELECT DISTINCT(OwnerUserId) FROM Posts)'))
+
+    # How many have not posted anything (question, answer or comment)?
+num.user.none<-as.integer(dbGetQuery(db,'SELECT COUNT(DISTINCT(Id))
+                     FROM Users
+                     WHERE NOT Id IN (SELECT DISTINCT(OwnerUserId) FROM Posts)
+                     AND NOT Id IN (SELECT DISTINCT(UserId) FROM Comments)'))
+rm(num.user.1q,num.user.ansonly,num.user.comonly,num.user.none)
+```
+
+***
+#6 What user answered the most questions?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+user.most.ans<-dbGetQuery(db,'SELECT OwnerUserId,COUNT(Id) 
+                     FROM Posts
+                     WHERE PostTypeId = "2"
+                     GROUP BY OwnerUserId
+                     ORDER BY COUNT(Id) DESC')[1,]
+rm(user.most.ans)
+```
+
+***
+#7 Do users with badges tend to answer more questions than they ask?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+    # number of questions asked by users with badges 
+dbGetQuery(db,'SELECT OwnerUserId,COUNT(Id) AS num_question
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND OwnerUserId IN 
+           (SELECT UserId
+           FROM Badges)
+           GROUP BY OwnerUserId
+           ORDER BY COUNT(Id) DESC')
+    # number of answers made by users with badges
+dbGetQuery(db,'SELECT OwnerUserId,COUNT(Id) AS num_answer
+           FROM Posts
+           WHERE PostTypeId = "2"
+           AND OwnerUserId IN 
+           (SELECT UserId
+           FROM Badges)
+           GROUP BY OwnerUserId
+           ORDER BY COUNT(Id) DESC')
+```
+
+***
+#8 How many different types of posts are there in the Posts table?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+post.type<-dbGetQuery(db,'SELECT DISTINCT(PostTypeId)
+                     FROM Posts
+                     ORDER BY PostTypeId ASC')
+rm(post.type)
+```
+
+***
+#9 What proportion of questions have an accepted answer and don’t?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+qwithaa<-dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND AcceptedAnswerId != "NA"')
+
+qwithoutaa<-dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND AcceptedAnswerId = "NA"')
+
+num.q<-dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"')
+as.numeric(qwithaa/num.q)
+as.numeric(qwithoutaa/num.q)
+rm(qwithaa,qwithoutaa)
+```
+
+***
+#11 What’s the most recent question in the Posts table?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+dbGetQuery(db,'SELECT Id,CreationDate
+           FROM Posts
+           WHERE PostTypeId = "1" AND CreationDate != "NA"
+           ORDER BY CreationDate DESC
+           LIMIT (50)')[1,]
+```
+
+***
+#12 What are the top 50 most common tags on questions?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+dbGetQuery(db,'SELECT Tags
+           FROM Posts
+           WHERE PostTypeId = "1"
+           GROUP BY Tags
+           ORDER BY COUNT(Tags) DESC
+           LIMIT 50')
+```
+
+***
+#13 For each of the top 50 tags on questions, how many questions are there for each tag.
+```{r,results='hide',warning=FALSE,message=FALSE,}
+dbGetQuery(db,'SELECT Tags,COUNT(Tags)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           GROUP BY Tags
+           ORDER BY COUNT(Tags) DESC
+           LIMIT 50')
+```
+
+***
+#17 How many questions are there each year?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2009"')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2010" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2011" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2012" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2013" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2014" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2015" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2016" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2017" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2018" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2019" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2020" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2021" ')
+dbGetQuery(db,'SELECT COUNT(Id)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND strftime("%Y", CreationDate) = "2022" ')
+```
+
+***
+#16 Programmatically find the questions where there are more comments than answers?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+dbGetQuery(db,'SELECT Id
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND CommentCount > AnswerCount')
+```
+
+***
+#20 How many questions have the terms Regression, ANOVA, Data Mining, Machine Learning, Deep Learning, Neural Network,
+```{r,results='hide',warning=FALSE,message=FALSE,}
+dbGetQuery(db,'SELECT Tags,COUNT(Tags)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND Tags LIKE "%regression%" or Tags LIKE "%ANOVA%"
+           or Tags LIKE "%data_mining%" or Tags LIKE "%machine_learning%"
+           or Tags LIKE "%deep_learning%" or Tags LIKE "%neural_network%"
+           GROUP BY Tags
+           ORDER BY COUNT(Tags) DESC')
+
+dbGetQuery(db,'SELECT COUNT(Tags)
+           FROM Posts
+           WHERE PostTypeId = "1"
+           AND Tags LIKE "%regression%" or Tags LIKE "%ANOVA%"
+           or Tags LIKE "%data_mining%" or Tags LIKE "%machine_learning%"
+           or Tags LIKE "%deep_learning%" or Tags LIKE "%neural_network%"')
+```
+
+***
+#23 Are there users in the Posts table that are not in the Users table? If so, how many and is there any pattern to this? 
+```{r,results='hide',warning=FALSE,message=FALSE,}
+dbGetQuery(db,'SELECT COUNT(OwnerUserId)
+           FROM Posts
+           WHERE NOT OwnerUserId IN 
+           (SELECT Id 
+           FROM Users)')
+```
+
+***
+#29 How is the user’s reputation related to the accepted answers?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+dbGetQuery(db,'SELECT Users.Id,Users.Reputation, COUNT(Posts.Id) AS Count_acceptedAnswer 
+           FROM Users
+           LEFT JOIN Posts
+           ON Posts.OwnerUserId = Users.Id
+           WHERE Users.Id != "-1"
+           GROUP BY Users.Id
+           ORDER BY Users.Reputation DESC
+           LIMIT (100)')
+
+dbGetQuery(db,'SELECT Users.Id,Users.Reputation, COUNT(Posts.Id) AS Count_accpetedAnswer 
+           FROM Users
+           LEFT JOIN Posts
+           ON Posts.OwnerUserId = Users.Id
+           WHERE Users.Id != "-1"
+           GROUP BY Users.Id
+           ORDER BY Users.Reputation ASC
+           LIMIT (100)')
+```
+
+***
+#30 Do the people who vote tend to have badges?
+```{r,results='hide',warning=FALSE,message=FALSE,}
+    # number of votes for each person
+num.vote<-dbGetQuery(db,'SELECT UserId,COUNT(Id)
+           FROM Votes
+           WHERE UserId != "NA"
+           AND UserId != "-1"
+           GROUP BY UserId
+           ORDER BY COUNT(Id) DESC')
+
+    # number of badges for each person
+num.badge<-dbGetQuery(db,'SELECT UserId,COUNT(Id)
+           FROM Badges
+           WHERE UserId != "NA"
+           AND UserId != "-1"
+           GROUP BY UserId
+           ORDER BY COUNT(Id) DESC')
+```
