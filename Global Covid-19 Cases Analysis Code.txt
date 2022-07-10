@@ -1,0 +1,294 @@
+---
+title: "Course Project Description"
+date: "March.12, 2022 "
+name: "Howie Huang 916870641"
+output: html_document
+---
+
+***
+
+## Abstract
+
+<span style='color:black'> 
+This data set is a record of Covid-19 report from WHO(https://covid19.who.int/WHO-COVID-19-global-data.csv) across the world. It 
+contains the number of daily new cases from every country, as well as cumulative
+cases, new deaths and cumulative deaths dated from 2020-1-3 to 2022-3-11. 
+
+In this project, the aim is to test whether there are any differences in the mean overall case-fatality rate across WHO Regions from March 2020 to February 2021 in 4 different seasons.The seasons are separated as the following:  
+
+Spring: March-May; Summer: June-August; Fall: September-November; Winter: December-February    
+The null hypothesis H0: the mean case-fatality in each season across different WHO Regions are the same  
+
+The alternative hypothesis Ha:the mean case-fatality in each season across different WHO Regions are not the same    
+Alpha is at default 0.05   
+
+```{r echo=FALSE, warning=FALSE}
+library(tidyverse)
+covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+```
+
+***
+
+# Background
+<span style='color:black'> 
+Coronavirus pandemic is a pandemic caused by the spread of severe acute 
+respiratory disease SARS-CoV-2. It was first identified amid an outbreak of 
+unknown respiratory illness cases in Wuhan, China.
+
+According to the data summary, this data set contains daily report from 2020-01
+-03 to 2022-02-18. There are a total of 237 different countries and 7 different
+WHO regions and 236 different country codes. The mean daily new cases among all 
+countries is 2387 cases per day; the mean cumulative cases is 533763; the
+mean daily new deaths is 31.83; the mean cumulative deaths is 10834. The overall
+case-mortality rate is approximately 0.01608 with intercept of 2254.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+
+summary(covid)
+length(unique(covid$Country))
+length(unique(covid$WHO_region))
+length(unique(covid$Country_code))
+case.mortality<-lm(covid$Cumulative_deaths~covid$Cumulative_cases)
+summary(case.mortality)
+
+ggplot(covid, aes(x=Date_reported, y=New_cases)) + geom_bar(stat="identity", width=0.1) +
+  theme_classic() +
+  labs(title = "Covid-19 Global Confirmed Cases", x= "Date", y= "Daily confirmed cases") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+library(maps)
+
+world <- map_data("world");
+
+covid.total<- covid %>% filter(Date_reported == '2022-3-11')
+covid.total$Country[227] <- 'USA'
+covid.total$Country[228] <- 'USA'
+covid.total$Country[25] <- 'Bolivia'
+
+covid.total<- covid.total %>% mutate(region=Country)
+covid.total<- inner_join(world, covid.total, by = "region")
+
+covid.map.total.cases<- ggplot() +
+  geom_polygon(data = covid.total, aes(x=long, y = lat, group = group, 
+    fill= Cumulative_cases)) + coord_fixed(1.3) + ggtitle('Total Cases by Country')
+covid.map.total.cases
+
+covid.map.total.deaths<-ggplot() +
+  geom_polygon(data = covid.total, aes(x=long, y = lat, group = group, 
+    fill= Cumulative_deaths)) + coord_fixed(1.3) + ggtitle('Total Deaths by Country')
+covid.map.total.deaths
+
+covid.total<- covid.total%>% mutate(Total_case_mortality = Cumulative_deaths/Cumulative_cases)
+
+covid.map.total.case.mortality<-ggplot() +
+  geom_polygon(data = covid.total, aes(x=long, y = lat, group = group, 
+    fill= Total_case_mortality)) + coord_fixed(1.3) + ggtitle('Total Case-Mortality by Country')
+covid.map.total.case.mortality
+```
+
+***
+
+## Descriptive Analysis
+<span style='color:black'> 
+The model I choose is the balanced two-way ANOVA. The two factors are WHO regions and seasons. I will use model.tables function to compare the treatments means.  
+
+First of all, I aim to clean up the data and create a data frame containing the 7 different WHO regions, the average overall case-mortality rate across all countries in the same WHO regions in each season, and the 4 different seasons. I then aim to create visualization of my model to help better understand the patterns and more complicated relations. At last I will create the model and use anova function to run analysis on the model. By using the model.table function, I will be able to test the hypothesis and make conclusion.  
+```{r,echo=FALSE,results='hide',message=FALSE,warning=FALSE, fig.show='hide'}
+spring<- covid %>% filter(across(Date_reported, ~ grepl('2020-03|2020-04|2020-05',.)))%>% mutate(Case_mortality = Cumulative_deaths/Cumulative_cases)%>% filter(Date_reported == '2020-05-31')%>%select(WHO_region,Case_mortality)
+summer<- covid %>% filter(across(Date_reported, ~ grepl('2020-06|2020-07|2020-08',.)))%>% mutate(Case_mortality = Cumulative_deaths/Cumulative_cases)%>% filter(Date_reported == '2020-08-31')%>%select(Case_mortality)
+fall<- covid %>% filter(across(Date_reported, ~ grepl('2020-09|2020-10|2020-11',.)))%>% mutate(Case_mortality = Cumulative_deaths/Cumulative_cases)%>% filter(Date_reported == '2020-11-30')%>%select(Case_mortality)
+winter<- covid %>% filter(across(Date_reported, ~ grepl('2020-12|2021-01|2021-02',.)))%>% mutate(Case_mortality = Cumulative_deaths/Cumulative_cases)%>% filter(Date_reported == '2021-02-28')%>%select(Case_mortality)
+
+season<-bind_cols(c(spring,summer,fall,winter))
+colnames(season)<-c('WHO_region','Spring','Summer','Fall','Winter')
+
+AFRO<- season%>%filter(WHO_region == 'AFRO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+AMRO<- season%>%filter(WHO_region == 'AMRO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+EMRO<- season%>%filter(WHO_region == 'EMRO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+EURO<- season%>%filter(WHO_region == 'EURO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+Other<- season%>%filter(WHO_region == 'Other') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+SEARO<- season%>%filter(WHO_region == 'SEARO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+WPRO<- season%>%filter(WHO_region == 'WPRO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+
+season.df<-rbind(AFRO,AMRO,EMRO,EURO,Other,SEARO,WPRO)
+
+
+plot.regions<-ggplot()+geom_bar(data=season,aes(x=WHO_region,fill=WHO_region))+xlab('Region Name')+ylab('Number of Country')+ggtitle('Number of Country in Each WHO Region')
+plot.regions
+
+
+regions.list<- c(rep("AFRO",4),rep("AMRO",4),rep("EMRO",4),rep("EURO",4),rep("Other",4),rep("SEARO",4),rep("WPRO",4))
+
+Mortality.list<-c(0.02477735,0.02153480,0.01891260,0.01885059,0.04712312,0.02392653,0.02204808,0.01853969,0.03273641,0.03397348,0.03519294,0.03529196,0.04783930,0.03605282,0.01798525,0.01883095,0.01754386,0.01754386,0.01754386,0.01744966,0.01625557,0.01116495,0.01149846,0.01032999,0.01949783,0.01759734,0.01320489,0.01115031)
+
+condition<- c('Spring','Summer','Fall','Winter')
+condition<- rep(condition,7)
+index<-c(1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4)
+season.df.<-data.frame(regions.list,condition,Mortality.list,index)
+
+plot.seasons<-ggplot()+geom_bar(data=season.df.,aes(x=regions.list,y=Mortality.list,fill=condition),position = 'dodge', stat = 'identity')+xlab('Region Name')+ylab('Average Case Mortality Rate')+ggtitle('Average Case Mortality Rate among Different WHO Regions by seasons')
+```
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+plot.regions
+plot.seasons
+print(season.df)
+print(season.df.)
+```
+***
+
+## Inferential Analysis
+```{r,echo=FALSE,results='hide',fig.show='hide',warning=FALSE,message=FALSE}
+library("ggpubr")
+ggboxplot(season.df., x = "regions.list", y = "Mortality.list", color = "condition",size = 3,width=0.5,xlab='Region Name',ylab='Average Case-Mortality Rate',title='Box Plot')
+
+season.aov2 <- aov(Mortality.list ~ regions.list*index, data = season.df.)
+summary(season.aov2)
+```
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+ggboxplot(season.df., x = "regions.list", y = "Mortality.list", color = "condition",size = 3,width=0.5,xlab='Region Name',ylab='Average Case-Mortality Rate',title='Box Plot')
+```
+
+***
+
+## Sensitivity Analysis
+<span style='color:black'> 
+From the plot "the Residual vs Fitted plot" we can tell there is no evident relationship between residuals and fitted values. This indicates that we can assume the homogeneity of variances, which is an assumption of two-way anova test. 
+
+From the normal QQ plot we can tell that the residuals are approximately normally distributed, which is another assumption of two-way anova test.  
+
+The tukey output includes all comparisons across all WHO regions, the mean differences for each comparison, as well as the lower-bound, upper-bond, and the adjusted p-value.  
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+season.aov2
+summary(season.aov2)
+plot(season.aov2)
+TukeyHSD(season.aov2)
+```
+
+***
+
+## Conclusion
+<span style='color:black'> 
+From the summary of two-way ANOVA, we can see that the p-value for both WHO regions and season are significant. This suggests that the null hypothesis is rejected in favor of the alternative hypothesis and alpha = 0.05. In conclusion,the mean case-fatality in each season across different WHO Regions are not the same.  
+
+However, if we want to take a closer look at each comparison, from the Tukey table above we can make conclusion about whether all comparisons share the same mean, the following comparison have a smaller p-value than alpha, therefore they reject the null hypothesis:  
+EMRO-AFRO  
+Other-AMRO  
+SEARO-AMRO  
+WPRO-AMRO  
+Other-EMRO  
+SEARO-EMRO  
+WPRO-EMRO  
+Other-EURO  
+SEARO-EURO  
+WPRO-EURO  
+Meanwhile, the rest of the comparisons fail to reject the null hypothesis.  
+
+***
+
+## Appendix R Code and Output
+```{r,results='hide',fig.show='hide',warning=FALSE,message=FALSE}
+library(tidyverse)
+covid <- read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+```
+
+```{r,results='hide',fig.show='hide',warning=FALSE}
+summary(covid)
+length(unique(covid$Country))
+length(unique(covid$WHO_region))
+length(unique(covid$Country_code))
+case.mortality<-lm(covid$Cumulative_deaths~covid$Cumulative_cases)
+summary(case.mortality)
+
+ggplot(covid, aes(x=Date_reported, y=New_cases)) + geom_bar(stat="identity", width=0.1) +
+  theme_classic() +
+  labs(title = "Covid-19 Global Confirmed Cases", x= "Date", y= "Daily confirmed cases") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+library(maps)
+
+world <- map_data("world");
+
+covid.total<- covid %>% filter(Date_reported == '2022-3-11')
+covid.total$Country[227] <- 'USA'
+covid.total$Country[228] <- 'USA'
+covid.total$Country[25] <- 'Bolivia'
+
+covid.total<- covid.total %>% mutate(region=Country)
+covid.total<- inner_join(world, covid.total, by = "region")
+
+covid.map.total.cases<- ggplot() +
+  geom_polygon(data = covid.total, aes(x=long, y = lat, group = group, 
+    fill= Cumulative_cases)) + coord_fixed(1.3) + ggtitle('Total Cases by Country')
+covid.map.total.cases
+
+covid.map.total.deaths<-ggplot() +
+  geom_polygon(data = covid.total, aes(x=long, y = lat, group = group, 
+    fill= Cumulative_deaths)) + coord_fixed(1.3) + ggtitle('Total Deaths by Country')
+covid.map.total.deaths
+
+covid.total<- covid.total%>% mutate(Total_case_mortality = Cumulative_deaths/Cumulative_cases)
+
+covid.map.total.case.mortality<-ggplot() +
+  geom_polygon(data = covid.total, aes(x=long, y = lat, group = group, 
+    fill= Total_case_mortality)) + coord_fixed(1.3) + ggtitle('Total Case-Mortality by Country')
+covid.map.total.case.mortality
+```
+
+```{r,results='hide',fig.show='hide',warning=FALSE}
+spring<- covid %>% filter(across(Date_reported, ~ grepl('2020-03|2020-04|2020-05',.)))%>% mutate(Case_mortality = Cumulative_deaths/Cumulative_cases)%>% filter(Date_reported == '2020-05-31')%>%select(WHO_region,Case_mortality)
+summer<- covid %>% filter(across(Date_reported, ~ grepl('2020-06|2020-07|2020-08',.)))%>% mutate(Case_mortality = Cumulative_deaths/Cumulative_cases)%>% filter(Date_reported == '2020-08-31')%>%select(Case_mortality)
+fall<- covid %>% filter(across(Date_reported, ~ grepl('2020-09|2020-10|2020-11',.)))%>% mutate(Case_mortality = Cumulative_deaths/Cumulative_cases)%>% filter(Date_reported == '2020-11-30')%>%select(Case_mortality)
+winter<- covid %>% filter(across(Date_reported, ~ grepl('2020-12|2021-01|2021-02',.)))%>% mutate(Case_mortality = Cumulative_deaths/Cumulative_cases)%>% filter(Date_reported == '2021-02-28')%>%select(Case_mortality)
+
+season<-bind_cols(c(spring,summer,fall,winter))
+colnames(season)<-c('WHO_region','Spring','Summer','Fall','Winter')
+
+AFRO<- season%>%filter(WHO_region == 'AFRO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+AMRO<- season%>%filter(WHO_region == 'AMRO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+EMRO<- season%>%filter(WHO_region == 'EMRO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+EURO<- season%>%filter(WHO_region == 'EURO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+Other<- season%>%filter(WHO_region == 'Other') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+SEARO<- season%>%filter(WHO_region == 'SEARO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+WPRO<- season%>%filter(WHO_region == 'WPRO') %>% mutate(Spring = mean(na.omit(Spring)))  %>% mutate(Summer = mean(na.omit(Summer))) %>% mutate(Fall = mean(na.omit(Fall))) %>% mutate(Winter = mean(na.omit(Winter))) %>% head(1)
+
+season.df<-rbind(AFRO,AMRO,EMRO,EURO,Other,SEARO,WPRO)
+
+
+plot.regions<-ggplot()+geom_bar(data=season,aes(x=WHO_region,fill=WHO_region))+xlab('Region Name')+ylab('Number of Country')+ggtitle('Number of Country in Each WHO Region')
+plot.regions
+
+
+regions.list<- c(rep("AFRO",4),rep("AMRO",4),rep("EMRO",4),rep("EURO",4),rep("Other",4),rep("SEARO",4),rep("WPRO",4))
+
+Mortality.list<-c(0.02477735,0.02153480,0.01891260,0.01885059,0.04712312,0.02392653,0.02204808,0.01853969,0.03273641,0.03397348,0.03519294,0.03529196,0.04783930,0.03605282,0.01798525,0.01883095,0.01754386,0.01754386,0.01754386,0.01744966,0.01625557,0.01116495,0.01149846,0.01032999,0.01949783,0.01759734,0.01320489,0.01115031)
+
+condition<- c('Spring','Summer','Fall','Winter')
+condition<- rep(condition,7)
+index<-c(1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4)
+season.df.<-data.frame(regions.list,condition,Mortality.list,index)
+
+plot.seasons<-ggplot()+geom_bar(data=season.df.,aes(x=regions.list,y=Mortality.list,fill=condition),position = 'dodge', stat = 'identity')+xlab('Region Name')+ylab('Average Case Mortality Rate')+ggtitle('Average Case Mortality Rate among Different WHO Regions by seasons')
+```
+
+```{r,results='hide',fig.show='hide',warning=FALSE}
+library("ggpubr")
+
+ggboxplot(season.df., x = "regions.list", y = "Mortality.list", color = "condition",size = 3,width=0.5,xlab='Region Name',ylab='Average Case-Mortality Rate',title='Box Plot')
+
+season.aov2 <- aov(Mortality.list ~ regions.list*index, data = season.df.)
+summary(season.aov2)
+season.aov2$residuals
+
+TukeyHSD(season.aov2,which = 'regions.list')
+plot(season.aov2)
+```
+
+
+
+
+
+
